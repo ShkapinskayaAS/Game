@@ -71,6 +71,7 @@ damage = base_attack + strength * 1.5
 crit_damage = damage * 2
 stamina = (health + will) // 5
 max_stamina = stamina
+max_health = health
 
 
 # --- Формуляр героя --------------------------------
@@ -89,12 +90,15 @@ print()
 # --- Враги подземелья ------------------------------
 enemies = ["упырь", "скелет", "паук", "голем"]
 log = []
-
+prices = {"зелье": 10, "масло": 15, "эликсир": 40}
+inventory = {}
+gold_total = 0
+ability_bonus = 0
 
 # --- Главный цикл игры ---------------------------
 running = True
 actions = 0
-menu_last = 7
+menu_last = 12
 
 
 outcome = "прерывание"
@@ -108,6 +112,11 @@ try:
         print("5 - осмотреть полки")
         print("6 - тренировка")
         print("7 - спуститься глубже")
+        print("8 - таблица лидеров")
+        print("9 - магазин")
+        print("10 - рюкзак")
+        print("11 - использовать предмет")
+        print("12 - купить предмет")
         print("0 - выйти из кузницы")
 
 
@@ -128,7 +137,6 @@ try:
             print("Вы внимательно осматриваетесь. В кузнице тихо, "
                   "только изредка потрескивает уголёк.")
 
-
         elif menu_number == 2:
             cost = 3
             if stamina >= cost:
@@ -139,7 +147,6 @@ try:
                 stamina = 0
                 print("Сил больше нет — вы идёте на одном упорстве.")
 
-
         elif menu_number == 3:
             stamina += 1
             if stamina > max_stamina:
@@ -147,19 +154,16 @@ try:
             print("Вы присаживаетесь на край скамьи и переводите дух. "
                   "Силы понемногу возвращаются.")
 
-
         elif menu_number == 4:
             stamina -= 1
             print("Вы осторожно касаетесь наковальни. Металл ещё хранит "
                   "слабое тепло — кузница заброшена не так давно.")
-
 
         elif menu_number == 5:
             will += 1
             stamina -= 2
             print("На пыльной полке вы находите старую эмблему "
                   "кузнечного цеха. Что-то внутри вас крепнет.")
-
 
         elif menu_number == 6:
             # --- Тренировочный бой ----------------------
@@ -197,7 +201,6 @@ try:
 
             stamina -= 4
 
-
         elif menu_number == 7:
             # --- Спуск и встреча с врагом ---------------
             if not enemies:
@@ -222,15 +225,14 @@ try:
                         hit_damage = crit_damage
                     else:
                         hit_damage = damage
-
-
+                    hit_damage += ability_bonus
                     enemy_hp -= hit_damage
 
 
                     if enemy_hp <= 0:
                         print(f"Раунд {round_n}: вы наносите {hit_damage:.1f} урона "
                               f"— критический удар! Враг падает.")
-                        log.append(f"раунд {round_n}: герой -{hit_damage:.1f}, {enemy} -0")
+                        log.append([round_n, hit_damage, 0])
                         break
 
 
@@ -239,20 +241,70 @@ try:
                     print(f"Раунд {round_n}: вы наносите {hit_damage:.1f} урона. "
                           f"Здоровье врага: {enemy_hp:.1f}. "
                           f"{enemy} наносит ответный удар: {enemy_damage}.")
-                    log.append(f"раунд {round_n}: герой -{hit_damage:.1f}, "
-                               f"{enemy} -{enemy_damage}")
-
+                    log.append([round_n, hit_damage, enemy_damage])
 
                 # --- Исход боя ---------------------------
                 if enemy_hp <= 0:
                     enemies.remove(enemy)
+                    gold_total += 15
                     print(f"{enemy} повержен! Осталось врагов в подземелье: {len(enemies)}.")
-
+                    print("Вы получили 15 золота.")
 
                 print(f"Бой: {round_n} раундов.")
-                print(f"Последняя запись журнала: {log[-1]}")
+                print(f"Последняя запись журнала: раунд {log[-1][0]}, "
+                      f"урон героя {log[-1][1]:.1f}, урон врага {log[-1][2]}.")
 
 
+        elif menu_number == 8:
+            if not log:
+                print("Вы ещё не сражались.")
+            else:
+                top = sorted(log, key=lambda r: r[1], reverse=True)[:3]
+                for i, r in enumerate(top, 1):
+                    print(f"{i}. Раунд {r[0]}: {r[1]:.1f} урона")
+                print(f"Самый сильный удар врага: {max(log, key=lambda r: r[2])[2]}")
+        elif menu_number == 9:
+            print("Магазин:")
+            for name, price in prices.items():
+                print(f"{name}: {price} золота")
+            print(f"Ваше золото: {gold_total}")
+        elif menu_number == 10:
+            if not inventory:
+                print("Рюкзак пуст.")
+            else:
+                for name, quantity in inventory.items():
+                    print(f"{name}: {quantity} шт.")
+        elif menu_number == 11:
+            item = input("Какой предмет использовать? ").strip().lower()
+            if inventory.get(item, 0) == 0:
+                print(f"В рюкзаке нет: {item}.")
+            else:
+                if item == "зелье":
+                    health = min(health + 10, max_health)
+                elif item == "масло":
+                    stamina = min(stamina + 5, max_stamina)
+                elif item == "эликсир":
+                    ability_bonus += 2
+                else:
+                    print("Неизвестный предмет.")
+                    continue
+                inventory[item] -= 1
+                if inventory[item] == 0:
+                    del inventory[item]
+        elif menu_number == 12:
+            item = input("Что купить? ").strip().lower()
+            try:
+                quantity = int(input("Сколько штук? "))
+            except ValueError:
+                quantity = 0
+            if item not in prices or quantity <= 0:
+                print("Проверь название предмета и количество.")
+            elif gold_total >= prices[item] * quantity:
+                gold_total -= prices[item] * quantity
+                inventory[item] = inventory.get(item, 0) + quantity
+                print(f"Куплено: {quantity} шт. {item}. Остаток золота: {gold_total}.")
+            else:
+                print("Не хватает золота.")
         elif menu_number == 0:
             print("Вы выходите из кузницы на свежий воздух. "
                   "Дверь со скрипом закрывается позади.")
@@ -289,7 +341,9 @@ finally:
         print(f"Забег окончен, {hero_name}. Действий совершено: {actions}.")
     else:
         print(f"Сеанс прерван, {hero_name}. Действий совершено: {actions}.")
+    if inventory:
+        print("В рюкзаке осталось:", inventory)
+    if log:
+        total = sum(r[1] for r in log)
+        print(f"Общий урон: {total:.1f}; средний за раунд: {total / len(log):.1f}.")
     print(frame)
-
-
-
